@@ -43,3 +43,15 @@ Start by inspecting files and reporting a concise audit with priority-ordered fi
 
 ## Medical safety
 Past discussions include reported ongoing chest pain radiating toward the left arm, elevated blood pressure and uncertain respiratory issues. These are *not verified diagnoses*. App must not infer fitness clearance, recommend strenuous exercise, or provide automated medication changes; red flags require urgent clinical evaluation. Avoid encoding uncertain conditions as confirmed diagnoses.
+
+## M1 audit milestone update
+
+See `AUDIT_M1.md` and the rewritten `M1_SETUP.md` for current findings, fixes,
+automated validation and remaining live acceptance steps. The owner supplied the
+missing original migration in chat; it is now preserved in Git. Additive 002 passed local tests; the owner subsequently reports it completed
+in Supabase. Its deployed definition and live authenticated behavior remain unverified. The new queue is immutable,
+IndexedDB v2 retains old data, account contexts invalidate old async work, and
+version-2 recovery archives retain tombstones/operations/conflicts/history.
+Do not mistake these tests for production readiness, encryption, independent
+backup or live Supabase verification. The earlier PRD milestone numbering is
+historical; current work follows this handoff's M1 auth/sync priorities.

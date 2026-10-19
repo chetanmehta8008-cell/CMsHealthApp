@@ -1,55 +1,160 @@
-# CMsHealth M1 — Setup and test
+# M1 configuration and dummy-data acceptance
 
-## What this version is
-A working **development build** with Supabase email/password authentication, optional Google OAuth, per-account IndexedDB cache, atomic local outbox, RPC uploads, full-table paginated pull, conflict review, tombstones and sync status. This is **not production-ready** and does not guarantee zero data loss, independent backup, E2EE, or verified medical AI. Do not enter real sensitive health information yet.
+M1 is a development build. Use dummy records until live security, encryption and
+independent recovery are verified. Local automated tests do not establish live
+Supabase readiness. See [AUDIT_M1.md](AUDIT_M1.md).
 
-## 1. Existing Supabase database
-You have already run `001_secure_core.sql`. Do not rerun it or the older `schema.sql`. Ensure four tables have RLS enabled. `health_entries` reads are scoped to `auth.uid()`, and writes go through `write_health_entry`.
+## 1. Preserve existing data and review SQL
 
-## 2. Client configuration
-Open `cmshealth/config.js`. Replace:
+The owner already ran `migrations/001_secure_core.sql`. That exact SQL is now
+saved in Git, with whitespace normalized. **Do not rerun it**, the legacy schema,
+or destructive resets. Export existing data through a trusted administrative
+backup method and retain existing local exports before any live change.
 
-- `https://YOUR-PROJECT.supabase.co` with **Project URL** (Supabase Dashboard → Project Settings → API).
-- `YOUR_PUBLISHABLE_OR_ANON_KEY` with your **publishable key** (or legacy anon key), from API Keys.
+Pause sync and close other app tabs before applying changes. Review `migrations/002_rpc_input_hardening.sql`: it replaces the RPC, validates
+version/delete inputs, serializes receipt IDs, avoids foreign-entry collision
+errors, and adds nullable revision source provenance. It does not drop tables
+or records. Older revision sources remain unknown/NULL. The owner reports it completed in the live project; do not rerun it as part of
+this checkout setup. Codex has not independently inspected the deployed definition.
+For future projects, test first in a disposable Supabase project if possible,
+then apply 002 once in SQL Editor after reviewing it and keeping a backup.
 
-The publishable/anon key is intended for client apps **when RLS is configured correctly**. **Never** put the database password, secret API key, or service-role key in `config.js`. Do not send these secrets in chat.
+Rollback plan: before applying, save the deployed `pg_get_functiondef` and its
+ACL in a secure administrative backup. If rollback is necessary, restore only
+that reviewed previous function definition and its explicit grants inside a
+transaction; **never rerun all of 001**. Leave the nullable `source` column in
+place so any new provenance is retained. Rollback restores known input/locking
+limitations; pause sync while investigating. No data deletion is part of rollback.
 
-## 3. Supabase Authentication settings
-In **Authentication → Providers → Email**, enable Email. For easiest initial test, create a user with email and password in the app and confirm via email. In **Authentication → URL Configuration**, set **Site URL** to the origin where you host the app and add the exact callback URL to **Redirect URLs**. For local testing use `http://localhost:8080/` as a redirect URL. Avoid broad wildcards in production.
+## 2. Configure public client settings
 
-Google login is optional: first enable and configure the Google provider with Google OAuth credentials in Supabase; add the Supabase OAuth callback URI to Google Cloud. Merely displaying the Google button does not configure OAuth.
+Copy the example into a Git-ignored local override:
 
-## 4. Serve the app
-On your Mac, open Terminal in the extracted `cmshealth` folder and run:
-
-```bash
-python3 -m http.server 8080
+```sh
+cp config.example.js config.local.js
 ```
 
-Then open `http://localhost:8080/` in your browser. **Do not** open `index.html` as `file://`. Initial login requires internet because the Supabase SDK is loaded from a CDN. Offline mode works only after the page and session have been loaded and cached; this is not yet a hardened installable offline app.
+Edit `config.local.js` with your **Project URL** and **publishable key** (or legacy
+anon key) from Supabase Project Settings → API/API Keys. These values are public
+client configuration; RLS is still essential. Never use a database password,
+service-role/secret API key, Google client secret, or a real `.env` in the browser
+or commit them to Git. Do not paste secrets in chat.
 
-## 5. Test in this order (dummy data only)
-1. Sign up, confirm email, and sign in. Verify your email appears in Settings.
-2. Add dummy BP 120/80; wait for **Cloud synchronized**. In Supabase Table Editor → `health_entries`, check that one row belongs to your user.
-3. Disconnect the network, add another dummy BP reading, and confirm **pending** appears. Reconnect; click **Sync now** in Settings. Confirm both rows in Supabase.
-4. Open the app on another device using a **hosted HTTPS URL**. `localhost` on the Mac cannot be accessed as `localhost` from your phone. Sign in with the same account; verify both readings appear.
-5. For conflict testing: edit the same synced record offline on device A, edit and sync it on B, then reconnect A. Review the conflict from Settings; export JSON before choosing a version.
-6. Export a JSON backup. Sign out and sign in again. Confirm data remains accessible.
+`config.js` remains the placeholder default. A missing local override is harmless
+except for a development-server 404 in the console. Keep a deployment-specific
+public config file outside Git if you host the app later. No host is deployed here. Publish only runtime assets if deploying later; never serve the entire checkout, handoff, `.git`, environment files, or test artifacts publicly.
 
-## 6. Critical limitations and next engineering tasks
-- No independently verified cloud backup/restore, immutable audit of rejected conflict choices, end-to-end encryption, attachment uploads, secure secrets storage beyond standard Supabase auth, automated source verification, AI, or device-to-device push sync.
-- The app stores **plaintext health entries in IndexedDB** on each signed-in device; cloud data is stored in Supabase. Do not share devices or use it for real sensitive medical information before client-side encryption and a privacy/security review.
-- If the browser storage is cleared while offline, unsynced records can be lost. Export backups and verify cloud status.
-- `config.js` is public by design. RLS and SQL grants must be independently security-tested before any public deployment.
-- Do not open multiple simultaneous tabs while making offline changes; robust multi-tab locking and comprehensive crash/recovery tests are future work.
-- If a user signs out with pending changes, those pending changes remain in **that account's local database** on that device; they are not transferred to other accounts.
-- The M0 database (`cmshealth-local-v1`) remains separate and is **not imported or uploaded automatically**. Export M0 JSON from the old version if you need to migrate, then explicitly import while signed into the intended account in M1.
-- The offline service worker is network-first and caches static app files, but the externally hosted Supabase SDK is not precached. For reliable offline cold starts, bundle and pin the SDK locally in a future build.
-- This prototype is not a medical device. It does not diagnose or provide medical clearance.
+## 3. Authentication settings
 
-## 7. Troubleshooting
-- **Sign in error**: check Email provider, confirmation email, Project URL and publishable key.
-- **Failed to fetch**: check internet, project status and allowed site URLs.
-- **RPC permission denied**: verify migration succeeded and function EXECUTE was granted to `authenticated`.
-- **Records stuck pending**: open Settings to see sync error; verify network and Supabase configuration.
-- **Google sign in fails**: complete provider setup; use email sign-in until then.
+- Enable Email in Authentication → Providers, with email confirmation.
+- Add the exact `http://localhost:8080/` and `http://localhost:8080/?recovery=1` callbacks under Authentication → URL
+  Configuration → Redirect URLs. Use the actual hosted HTTPS origin as Site URL
+  when available; do not invent a deployment or use broad production wildcards.
+- Use two disposable email accounts for isolation testing. After setup, restrict
+  new sign-ups if appropriate for personal use.
+- Google is optional: configure its provider in Supabase and the exact Supabase
+  callback in Google Cloud. Keep Google's secret in Supabase, never this client.
+- Recovery uses the originating browser's PKCE verifier: request/open the recovery
+  link in the same browser profile. The recovery callback (including `?recovery=1`) must be allowlisted. The explicit
+  recovery route also handles the pinned SDK’s PKCE callback, which does not
+  reliably emit PASSWORD_RECOVERY. Enter and
+  confirm a new password in the app. Cross-browser links, expired links, and
+  password-refresh/session-revocation behavior require live testing.
+
+## 4. Local development and automated checks
+
+From `CMsHealthApp`, use Node 22+ (Node 24 tested) and Python 3:
+
+```sh
+npm ci
+npm run check
+npm test
+npm run test:sql
+npm run test:browser
+python3 -m http.server 8080 --bind 127.0.0.1
+```
+
+Open the local origin in your browser. Chromium is already installed in this
+cloud environment. On Mac, set `CHROMIUM_PATH` to an installed Chrome/Chromium
+executable for `npm run test:browser`; for example:
+
+```sh
+CHROMIUM_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm run test:browser
+```
+
+No build step or runtime npm dependencies are required. The pinned Supabase SDK
+is vendored locally, not fetched at runtime. Service-worker updates wait for old
+tabs to close; reload after closing other app tabs. Existing v1 IndexedDB stores
+upgrade transactionally to v2, retaining entries/conflicts and copying old outbox
+operations into the immutable mutation store. Do not delete old caches/databases
+to troubleshoot; export first.
+
+## 5. Dummy live tests, in order
+
+1. Sign up as A, confirm the email, sign in, and verify the account shown in
+   Settings. Test incorrect password, reset link/new password and sign-out. Test
+   refresh/expiry/revocation and canceled OAuth separately; do not assume success.
+2. Add BP **120/80**. Wait for “Cloud checked · no pending changes,” inspect Settings
+   for errors, then verify its UUID, owner, version and payload in health_entries.
+   A status label alone is not proof of correct server isolation.
+3. Disconnect, create/edit another dummy record, reload while offline, and verify
+   it remains. Reconnect: operations should upload in order, with one receipt
+   per accepted mutation. On a simulated lost response, retry must not add another
+   revision for the same mutation ID.
+4. Delete a new entry while its upload is delayed, reconnect and confirm its
+   cloud tombstone persists; it must not reappear. Verify earlier revisions remain.
+5. Open two tabs on one account. Open the same editor in each, save in the first,
+   then attempt to save in the second. The second must report a stale edit without
+   replacing the first. Export/review before closing an unsaved form.
+6. Sign in as B in a separate browser profile. It must not read A's entries,
+   revisions, profiles or receipts. Test guessed A UUID reads and RPC writes with
+   B's own session; no foreign payload/version may be returned. Signed-out/anon
+   requests must not read these tables or execute the RPC. Direct browser writes
+   to health_entries, entry_revisions and sync_receipts must be denied. Do not use
+   the SQL Editor's privileged session as evidence of RLS isolation.
+7. On another device, use an explicitly configured **HTTPS host** and the same A
+   account. Log/edit/delete in both directions. Edit the same synced row offline
+   on A and online on B, then reconnect A. Inspect local/cloud candidates, export
+   the recovery archive and choose explicitly. Both candidates/decision must be
+   present in local history. Phone localhost is not the Mac's localhost.
+8. Switch accounts or sign out during a delayed upload/pull. Old results must not
+   appear in the next account. Pending records remain in the original account's
+   local database; sign-out does not erase them. Sign-out is local-device scope,
+   not a promise to revoke all devices.
+
+Multi-session SQL contention tests (same entry and same mutation ID/different
+entries) still need native/live PostgreSQL verification. The embedded suite is
+single-connection and uses two simulated auth identities with real PostgreSQL RLS.
+
+## 6. Independent archive and restore drill
+
+Settings → Export JSON produces an **unencrypted version-2 recovery archive**:
+entries (including deleted), immutable attempted/pending operations, conflicts,
+and local history from one consistent IndexedDB transaction. Store it somewhere
+independent and secure. Exports do not contain the login session or encryption
+keys, and there is no automatic backup service or tested key recovery yet.
+
+For a restore drill, retain the original file and use a **fresh browser profile**:
+open `http://localhost:8080/?restore=1` before signing into the same dummy account.
+The restore query pauses cloud sync before the first pull. Sign in, verify the
+paused status, and import the archive into the empty cache. Compare IDs, counts,
+timestamps, deletions, operations, conflicts and history with the original. Resume
+cloud sync explicitly from Settings only after verifying the archive. Do not clear
+the original profile. A full recovery archive cannot be restored over existing
+local state or into a different account; the import aborts without replacement.
+
+Old M0/version-1 imports are separately supported with explicit confirmation.
+All records validate before a single local transaction commits, duplicate/matching
+IDs are rejected, and no existing record is silently replaced. Imported legacy
+records queue as cloud changes; they are not a trusted server snapshot. Legacy
+local timestamps lacking an offset cannot be reliably reinterpreted across zones.
+CSV remains a view export, not a complete restore format.
+
+## Remaining limits
+
+Plaintext records/archives, no independent encrypted cloud backup, no realtime
+push guarantee, best-effort foreground retries and full-table keyset scans,
+incomplete clinical range validation and no production security/deployment review.
+A failing queued record stops a sync pass visibly; it is never silently discarded.
+Browsers without Web Locks keep local changes but pause cloud synchronization.
+No AI/provider billing, automatic medical decisions, or exercise clearance.
