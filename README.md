@@ -1,26 +1,44 @@
-# CMsHealth App — working M0 prototype
+# CMsHealth App
 
-## Launch
-- **Simplest:** open `index.html` in Chrome, Edge or Firefox. The app works locally with IndexedDB; PWA installation/offline asset caching may not work from a `file://` URL.
-- **Recommended:** from this folder run `python3 -m http.server 8000`, then open `http://localhost:8000`. On localhost, the service worker can cache the app for offline use.
-- **Phone:** host the folder over HTTPS to access it from your Motorola Edge 60 Fusion, then use the browser's **Install app / Add to Home screen** option. HTTPS hosting does not automatically add cloud sync.
+Personal local-first health tracker. **M1 development build: dummy records only.**
+Read [AGENTS.md](AGENTS.md), [CODEX_HANDOFF.md](CODEX_HANDOFF.md),
+[PRODUCT_SPEC.md](PRODUCT_SPEC.md), and the prioritized [M1 audit](AUDIT_M1.md).
 
-## What works
-- Overview and latest vitals; BP line chart; recent timeline.
-- Add/edit/delete backdated entries for vitals, symptoms, food, activity, habits, sleep, medication and records.
-- Global record search (Ctrl/Cmd + K), lifetime timeline, health passport, print-to-PDF.
-- Local IndexedDB persistence, JSON backup/import and CSV exports.
-- Manual light/dark mode, mobile-responsive interface, PWA manifest and static cache.
+## Run and test
 
-## What does NOT work yet
-- Google login, Supabase database, cross-device sync, conflict resolution, encrypted storage/backups, AI chat, source verification, reminders/push, file uploads, OCR, voice, barcode/photo scanning, wearable connections.
-- Medical interpretation or exercise clearance.
+```sh
+npm ci
+npm run check
+npm test
+npm run test:sql
+npm run test:browser
+python3 -m http.server 8080 --bind 127.0.0.1
+```
 
-## Important privacy and safety notes
-- **Sensitive data is stored unencrypted in this browser's IndexedDB.** Do not enter secrets or irreplaceable records unless you accept the local-device risk.
-- **Exports are unencrypted.** Keep them secure and make backups regularly; browser data may be deleted by the OS or user.
-- This app is not a medical device. The user has previously described chest pain radiating to the arm: seek urgent medical evaluation if ongoing, and do not use the app to authorize exercise.
-- The app does not contact external servers, analytics, or AI services in this M0 build.
+Browser tests require Chromium (`/usr/bin/chromium` here); set `CHROMIUM_PATH`
+for another installed Chrome/Chromium executable. No cloud credentials are
+needed for automated tests. The app itself is static: no bundler/server build
+or paid service is required. Do not open it using `file://`.
 
-## Next engineering step
-Implement M1 local schema validation, encryption and tests; then M2 Supabase Auth + PostgreSQL RLS + encrypted offline synchronization. See PRODUCT_SPEC.md and schema.sql.
+Follow [M1_SETUP.md](M1_SETUP.md) for public Supabase configuration, the reviewed
+additive migration, dummy tests and recovery. Migration 001 was already applied
+by the owner: **do not rerun it or any legacy schema**. Migration 002 passed local tests; the owner reports it completed in Supabase.
+The deployed definition and authenticated live behavior remain unverified.
+
+## Implemented and unverified
+
+- Responsive blue dashboard, local record CRUD, BP charts, search, timeline,
+  health passport and light/dark interface.
+- Email/OAuth client, recovery UI, account-scoped IndexedDB, durable mutation
+  queue/tombstones, explicit conflict review/history, retries and sync status.
+- Bundled offline SDK; atomic plaintext recovery export/restore and legacy import
+  that rejects matching IDs instead of overwriting them.
+- Automated IndexedDB/auth, embedded PostgreSQL permission, and real Chromium
+  tests. SDK integration fixtures are simulated; live Supabase and cross-device
+  behavior require the acceptance steps in M1_SETUP.
+
+Health data and archives are **not encrypted**. No independent backup service,
+AI, wearable bridge, document uploads, verified public deployment, medical
+decisions or exercise clearance. Local caches and sync are not substitutes for
+independent backups. Never claim 100% medical/AI accuracy or guaranteed recovery.
+₹0 by default; no paid features or AI providers are enabled.

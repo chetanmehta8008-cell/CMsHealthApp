@@ -1,6 +1,8 @@
 # CMsHealth App — Step 1: secure Supabase foundation
 
-**Status:** Migration and configuration instructions prepared; no changes have been made to your Supabase project. This SQL is for a **new, empty** Supabase project. Do **not** run alongside the older `schema.sql`; it creates overlapping tables. Export any existing data before changing a database.
+**Historical Step 1 instructions.** The owner reports migration 001 has already run. Do not repeat Step 2 on that database. Follow [M1_SETUP.md](M1_SETUP.md) and [AUDIT_M1.md](AUDIT_M1.md) for current configuration and the additive migration 002.
+
+**Original status:** Migration and configuration instructions prepared; no changes had been made to the Supabase project by the assistant. This SQL is for a **new, empty** Supabase project. Do **not** run alongside the older `schema.sql`; it creates overlapping tables. Export any existing data before changing a database.
 
 ## 1. Configure authentication
 1. Supabase Dashboard → Authentication → Providers → Email: enable email sign-in. Enable email confirmation for production. For early testing, use a confirmed email address.

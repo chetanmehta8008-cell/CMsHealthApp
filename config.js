@@ -1,2 +1,2 @@
-// Local configuration placeholder. Replace these two PUBLIC values before running.
+// Public defaults only. Optional ignored config.local.js overrides these values.
 window.CMS_CONFIG={url:'https://YOUR-PROJECT.supabase.co',publishableKey:'YOUR_PUBLISHABLE_OR_ANON_KEY'};
